@@ -1,0 +1,258 @@
+FUZZY DISH RECOMMENDATION SYSTEM
+
+=== HOW TO RUN ===
+1. Activate virtual environment:
+   .\.venv\Scripts\activate
+
+2. Install dependencies:
+   pip install numpy scipy scikit-fuzzy packaging
+
+3. Run the program:
+   python main.py
+
+=== HOW IT WORKS ===
+
+-- INPUT UNIVERSE (0-10 scale) --
+All features use a 0-10 scale with 0.1 increments:
+x_universe = [0.0, 0.1, 0.2, ..., 10.0] (101 values total)
+
+-- MEMBERSHIP FUNCTIONS --
+Triangular functions define feature categories. Example for taste:
+
+Taste Categories:
+- Sweet:  Peak at 0, ends at 2.5
+- Salty:  Peak at 3.5, spans 2-5
+- Spicy:  Peak at 5.5, spans 4-7
+- Sour:   Peak at 7.5, spans 6-8.5
+- Bitter: Peak at 10, spans 8-10
+
+-- DISH DATABASE --
+20 predefined dishes with 0-10 ratings for 7 features. Example:
+
+Pizza:
+- Taste: 4 (between Salty and Spicy)
+- Price: 5 (Medium)
+- Temperature: 9 (Hot)
+- Prep Time: 5 (Medium)
+- Calories: 9 (High)
+- Availability: 1 (Common)
+- Satiety: 9 (Filling)
+
+-- FUZZIFICATION PROCESS --
+compute_memberships() converts crisp values to category memberships:
+
+Example for taste=6.0:
+- Sweet: 0%
+- Salty: 0%
+- Spicy: 66.6%
+- Sour: 100%
+- Bitter: 0%
+
+-- USER INTERACTION --
+1. Preference Input:
+   Slider-like CLI for each feature:
+   "Taste: | sweet --- salty --- spicy --- sour --- bitter |"
+   User enters numerical value (0-10)
+
+2. Feature Weighting:
+   User ranks features from most (1) to least (7) important
+
+-- SCORING ALGORITHM --
+1. Calculate similarity between user preferences and dish features
+2. Apply feature weights
+3. Aggregate scores
+
+Scoring Formula:
+Total Score = Σ (Feature Weight * Category Match Score)
+
+=== EXAMPLE SCENARIO ===
+
+User Input:
+- Taste: 6.0
+- Price: 2.0
+- Temperature: 9.0
+- Prep Time: 1.0
+- Calories: 8.0
+- Availability: 3.0
+- Satiety: 6.0
+
+Feature Ranking Input:
+4 1 2 7 5 3 6 (Prep Time > Taste > Price > Satiety > Calories > Temperature > Availability)
+
+Calculated Weights:
+- Prep Time: 25%
+- Taste: 21%
+- Price: 18%
+- Satiety: 14%
+- Calories: 11%
+- Temperature: 7%
+- Availability: 4%
+
+Pizza Score Calculation:
+- Taste Match: 21% similarity * 21% weight = 0.044
+- Price Match: 54% similarity * 18% weight = 0.097
+- ... (other features)
+- TOTAL SCORE: 0.51
+
+=== FINAL RECOMMENDATIONS ===
+1. Ice Cream (0.72)
+2. Pizza (0.51)
+3. Sushi (0.43)
+...
+
+=== KEY FUNCTIONS ===
+
+compute_memberships(val, functions)
+- Converts numerical value to category memberships
+- Input: Number (0-10), membership functions
+- Output: Dictionary of {category: membership_degree}
+
+ask_user_preferences()
+- Collects user preferences through CLI
+- Validates 0-10 range
+- Returns: Dictionary {feature: value}
+
+compute_scores()
+- Calculates dish-user similarity
+- Applies feature weights
+- Returns: Sorted list of (dish, score)
+
+=== FUZZY LOGIC CONCEPTS ===
+
+Triangular Membership Function:
+fuzz.trimf(x_universe, [left, peak, right])
+- left: Start of membership increase
+- peak: Full membership (1.0)
+- right: End of membership decrease
+
+Membership Calculation:
+fuzz.interp_membership(x, mf, value)
+- Returns membership degree for exact value
+- Example: Value 6.0 in "sour" category = 100%
+
+---
+
+
+=== FUNCTIONS - INPUT/OUTPUT FORMATS ===
+
+ask_user_preferences()
+(Input: None | Output: dict)
+Returns:
+{
+  'taste': float (0.0-10.0),
+  'price': float,
+  'temperature': float,
+  'prep_time': float,
+  'calories': float,
+  'availability': float,
+  'satiety': float
+}
+
+Example Output:
+{
+  'taste': 6.0,
+  'price': 2.0,
+  'temperature': 9.0,
+  'prep_time': 1.0,
+  'calories': 8.0,
+  'availability': 3.0,
+  'satiety': 6.0
+}
+
+---
+
+compute_user_memberships(user_values)
+(Input: dict | Output: nested dict)
+Structure:
+{
+  'feature1': {
+    'category1': membership (0.0-1.0),
+    'category2': membership,
+    ...
+  },
+  ...
+}
+
+Example for taste=6.0:
+{
+  'taste': {
+    'sweet': 0.0,
+    'salty': 0.0,
+    'spicy': 0.666,
+    'sour': 1.0,
+    'bitter': 0.0
+  }
+}
+
+Example for calories=8.0:
+{
+  'calories': {
+    'low': 0.0,
+    'medium': 0.0,
+    'high': 0.5
+  }
+}
+
+---
+
+ask_user_feature_weights()
+(Input: None | Output: dict)
+Format:
+{
+  'taste': normalized_weight (0.0-1.0),
+  'price': normalized_weight,
+  'temperature': normalized_weight,
+  'prep_time': normalized_weight,
+  'calories': normalized_weight,
+  'availability': normalized_weight,
+  'satiety': normalized_weight
+}
+
+Example for input "4 1 2 7 5 3 6":
+{
+  'prep_time': 0.25,  # 7/28
+  'taste': 0.214,     # 6/28 ≈ 0.214
+  'price': 0.178,     # 5/28 ≈ 0.178
+  'satiety': 0.143,   # 4/28 ≈ 0.143
+  'calories': 0.107,  # 3/28 ≈ 0.107
+  'temperature': 0.071, # 2/28 ≈ 0.071
+  'availability': 0.035 # 1/28 ≈ 0.035
+}
+
+---
+
+compute_scores(user_membership, weights)
+(Input: (dict, dict) | Output: list of tuples)
+Returns:
+[
+  ('Dish Name', total_score (float)),
+  ...
+]
+
+Pizza Calculation Example:
+1. Taste Analysis:
+   - Pizza value: 4
+   - Pizza memberships: {'salty': 0.666, ...}
+   - User memberships: {'spicy': 0.666, 'sour': 1.0}
+   - Match: 0.666*0.666 + 1.0*0.0 = 0.443
+   - Weighted: 0.443 * 0.214 = 0.095
+
+2. Satiety Analysis:
+   - Pizza value: 9 → {'filling': 1.0}
+   - User memberships: {'filling': 0.75}
+   - Match: 0.75 * 1.0 = 0.75
+   - Weighted: 0.75 * 0.143 = 0.107
+
+Total Score = Σ all weighted features
+
+---
+
+show_results(results)
+(Input: list of tuples | Output: console print)
+Display Format:
+"1. Dish Name - score: X.XX"
+Example Output:
+1. Ice Cream - score: 0.72
+2. Pizza - score: 0.51
+3. Sushi - score: 0.43
+...
