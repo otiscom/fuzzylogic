@@ -93,23 +93,26 @@ dishes = {
 }
 
 # Computes fuzzy membership for a given value against all category functions
-def compute_memberships(val, functions):
-    return {cat: fuzz.interp_membership(x_universe, mf, val) for cat, mf in functions.items()}
-
-# Prompts the user for values for each feature (0–10)
 def ask_user_preferences():
-    print("Enter your preference values for each feature (0–10):")
+    """
+    Pyta użytkownika o wartość 0–10 dla każdej cechy.
+    Jeśli wpisze '#', ta cecha jest pomijana (wartość = None).
+    Zwraca: dict feature -> float | None
+    """
+    print("Wprowadź swoje wartości preferencji dla każdej cechy (0–10). Wpisz '#' aby pominąć.")
     preferences = {}
     for pl_name, key in feature_key.items():
-        print(f"Preference for '{pl_name.capitalize()}':")
+        print(f"Preferencja dla '{pl_name.capitalize()}':")
         print(feature_sliders[pl_name])
-        val = input("Your value: ")
+        val = input("Twoja wartość (0–10 lub '#'): ").strip()
+        if val == "#":
+            preferences[key] = None
+            continue
         try:
-            val = float(val)
+            num = float(val)
         except ValueError:
-            val = 0.0
-        val = min(max(val, 0.0), 10.0)
-        preferences[key] = val
+            num = 0.0
+        preferences[key] = min(max(num, 0.0), 10.0)
     return preferences
 
 # Computes fuzzy membership dict for all user preferences
@@ -122,34 +125,47 @@ def compute_user_memberships(user_values):
     }
 
 # Asks the user to rank the importance of each feature and converts to normalized weights
-def ask_user_feature_weights():
-    print("Now rank the importance of features from most to least important.")
-    print("Provide 7 unique numbers separated by spaces.")
+def ask_user_feature_weights(excluded_features=None):
+    """
+    Pyta użytkownika o ranking ważności tylko dla nie-pominiętych cech.
+    Input:
+      excluded_features: set internal_key cech, które mają być pominięte
+    Return: dict feature -> normalizowana waga (suma=1)
+    """
+    if excluded_features is None:
+        excluded_features = set()
+
+    # Budujemy mapę tylko dla cech nie-pominiętych
     num_to_feature = {
-        1: 'taste', 2: 'price', 3: 'temperature', 4: 'prep_time',
-        5: 'calories', 6: 'availability', 7: 'satiety'
+        1:'taste',2:'price',3:'temperature',4:'prep_time',
+        5:'calories',6:'availability',7:'satiety'
     }
-    for num, feat in num_to_feature.items():
-        pl = list(feature_key.keys())[list(feature_key.values()).index(feat)]
+    available = {n: f for n, f in num_to_feature.items() if f not in excluded_features}
+
+    print("\nTeraz uporządkuj ważność poniższych cech:")
+    for num, feat in available.items():
+        pl = next(pl for pl,k in feature_key.items() if k == feat)
         print(f"  {num}. {pl}")
-    order_input = input("Ranking (e.g. '4 1 2 7 5 3 6'): ")
+    order_input = input(f"Kolejność (podaj {len(available)} unikalnych numerów): ").split()
+
     try:
-        order_nums = list(map(int, order_input.strip().split()))
-        if sorted(order_nums) != list(range(1, 8)):
+        order_nums = list(map(int, order_input))
+        if set(order_nums) != set(available.keys()):
             raise ValueError
     except ValueError:
-        print("Error: Provide exactly 7 unique numbers from 1 to 7.")
+        print("Błąd: podaj dokładnie odfiltrowane numery raz każdy.")
         exit(1)
-    order_features = [num_to_feature[n] for n in order_nums]
+
+    order_features = [available[n] for n in order_nums]
+    # Nadawanie wag malejąco od len(...) do 1 i normalizacja sumy
     weights = {}
-    total = 0
+    total = sum(range(1, len(order_features)+1))
     for rank, feature in enumerate(order_features, start=1):
         w = len(order_features) - (rank - 1)
-        weights[feature] = w
-        total += w
-    for f in weights:
-        weights[f] /= total
+        weights[feature] = w / total
+
     return weights
+
 
 # Computes the recommendation score for all dishes
 def compute_scores(user_membership, weights):
@@ -170,14 +186,18 @@ def compute_scores(user_membership, weights):
 
 # Prints the final ranking
 def show_results(results):
-    print("Recommended dishes:")
+    print("Zalecane dania:")
     for i, (dish, score) in enumerate(results, start=1):
-        print(f"{i}. {dish} – score: {score:.2f}")
+        print(f"{i}. {dish} – wynik: {score:.2f}")
 
 
+# Przykładowe użycie w main:
 if __name__ == "__main__":
     user_values = ask_user_preferences()
-    user_membership = compute_user_memberships(user_values)
-    weights = ask_user_feature_weights()
+    excluded = {feat for feat, val in user_values.items() if val is None}
+    # fuzzyfikacja pomija None
+    user_membership = compute_user_memberships({k:v for k,v in user_values.items() if v is not None})
+    # ranking wag pomija cechy z excluded
+    weights = ask_user_feature_weights(excluded_features=excluded)
     results = compute_scores(user_membership, weights)
     show_results(results)
